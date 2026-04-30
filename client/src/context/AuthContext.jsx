@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { apiRequest } from "../lib/api";
 
 const AuthContext = createContext(null);
@@ -44,6 +44,26 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     persist({ token: "", user: null });
   };
+
+  useEffect(() => {
+    const verifySession = async () => {
+      if (!token) return;
+
+      try {
+        const response = await apiRequest("/auth/me", { token });
+        if (response?.data?._id) {
+          persist({ token, user: response.data });
+        }
+      } catch (error) {
+        if (error?.status === 401) {
+          logout();
+        }
+      }
+    };
+
+    verifySession();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   const value = {
     token,

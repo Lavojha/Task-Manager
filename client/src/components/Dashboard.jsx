@@ -50,11 +50,15 @@ export const Dashboard = ({ auth }) => {
       const projectTasks = allTaskResponses.flatMap((response) => response.data || []);
       setTasks(projectTasks);
     } catch (loadError) {
+      if (loadError?.status === 401) {
+        auth.logout();
+        return;
+      }
       setError(loadError.message);
     } finally {
       setLoading(false);
     }
-  }, [auth.token]);
+  }, [auth]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect

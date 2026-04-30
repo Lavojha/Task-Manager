@@ -1,10 +1,19 @@
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
+class ApiError extends Error {
+  constructor(message, status, payload) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.payload = payload;
+  }
+}
+
 const parseResponse = async (response) => {
   const payload = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(payload.message || "Request failed");
+    throw new ApiError(payload.message || "Request failed", response.status, payload);
   }
 
   return payload;
@@ -17,11 +26,19 @@ export const apiRequest = async (path, { method = "GET", token, body } = {}) => 
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_URL}${path}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  let response;
+  try {
+    response = await fetch(`${API_URL}${path}`, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch (error) {
+    throw new Error(
+      "Cannot connect to backend server. Please start backend and check VITE_API_URL.",
+      { cause: error }
+    );
+  }
 
   return parseResponse(response);
 };
