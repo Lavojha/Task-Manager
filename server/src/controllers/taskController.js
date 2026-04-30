@@ -5,14 +5,18 @@ import Project from '../models/Project.js';
 export const createTask = async (req, res) => {
   try {
     const { title, description, project, assignedTo, priority, dueDate } = req.body;
-    const isAssigneeMember = req.project.members.some(
-      (member) => member.user.toString() === assignedTo
-    );
+    const assigneeIds = Array.isArray(assignedTo)
+      ? [...new Set(assignedTo.filter(Boolean))]
+      : assignedTo
+      ? [assignedTo]
+      : [];
+    const memberIds = req.project.members.map((member) => member.user.toString());
+    const hasInvalidAssignee = assigneeIds.some((id) => !memberIds.includes(id));
 
-    if (assignedTo && !isAssigneeMember) {
+    if (hasInvalidAssignee) {
       return res.status(400).json({
         success: false,
-        message: 'Assigned user must be a project member',
+        message: 'All assigned users must be project members',
       });
     }
 
@@ -20,7 +24,7 @@ export const createTask = async (req, res) => {
       title,
       description,
       project,
-      assignedTo,
+      assignedTo: assigneeIds,
       priority,
       dueDate,
       createdBy: req.user._id,
@@ -52,7 +56,7 @@ export const getProjectTasks = async (req, res) => {
 
     const query = { project: req.params.projectId };
     if (!isAdmin) {
-      query.assignedTo = req.user._id;
+      query.assignedTo = { $in: [req.user._id] };
     }
 
     const tasks = await Task.find(query)
@@ -77,7 +81,7 @@ export const getProjectTasks = async (req, res) => {
 
 export const getMyTasks = async (req, res) => {
   try {
-    const tasks = await Task.find({ assignedTo: req.user._id })
+    const tasks = await Task.find({ assignedTo: { $in: [req.user._id] } })
       .populate('project', 'name')
       .populate('createdBy', 'name email')
       .sort({ dueDate: 1 });
@@ -117,7 +121,9 @@ export const updateTask = async (req, res) => {
         member.role === 'Admin'
     );
 
-    const isAssigned = task.assignedTo && task.assignedTo.toString() === req.user._id.toString();
+    const isAssigned = Array.isArray(task.assignedTo)
+      ? task.assignedTo.some((userId) => userId.toString() === req.user._id.toString())
+      : false;
 
     if (!isAdmin && !isAssigned) {
       return res.status(403).json({
@@ -137,18 +143,22 @@ export const updateTask = async (req, res) => {
       if (priority) task.priority = priority;
       if (dueDate) task.dueDate = dueDate;
       if (assignedTo !== undefined) {
-        const isAssigneeMember = project.members.some(
-          (member) => member.user.toString() === assignedTo
-        );
+        const assigneeIds = Array.isArray(assignedTo)
+          ? [...new Set(assignedTo.filter(Boolean))]
+          : assignedTo
+          ? [assignedTo]
+          : [];
+        const memberIds = project.members.map((member) => member.user.toString());
+        const hasInvalidAssignee = assigneeIds.some((id) => !memberIds.includes(id));
 
-        if (assignedTo && !isAssigneeMember) {
+        if (hasInvalidAssignee) {
           return res.status(400).json({
             success: false,
-            message: 'Assigned user must be a project member',
+            message: 'All assigned users must be project members',
           });
         }
 
-        task.assignedTo = assignedTo || null;
+        task.assignedTo = assigneeIds;
       }
     }
 
@@ -207,7 +217,7 @@ export const getDashboardStats = async (req, res) => {
 
     const query = { project: projectId };
     if (!isAdmin) {
-      query.assignedTo = req.user._id;
+      query.assignedTo = { $in: [req.user._id] };
     }
 
     const tasks = await Task.find(query).populate('assignedTo', 'name');
@@ -226,10 +236,11 @@ export const getDashboardStats = async (req, res) => {
 
     const tasksPerUser = {};
     tasks.forEach((task) => {
-      if (task.assignedTo) {
-        const userId = task.assignedTo._id.toString();
-        const userName = task.assignedTo.name;
-        
+      const assignees = Array.isArray(task.assignedTo) ? task.assignedTo : [];
+      assignees.forEach((assignee) => {
+        const userId = assignee._id.toString();
+        const userName = assignee.name;
+
         if (!tasksPerUser[userId]) {
           tasksPerUser[userId] = {
             name: userName,
@@ -237,7 +248,7 @@ export const getDashboardStats = async (req, res) => {
           };
         }
         tasksPerUser[userId].count++;
-      }
+      });
     });
 
     res.status(200).json({

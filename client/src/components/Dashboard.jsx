@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiRequest } from "../lib/api";
+import { DashboardHeader } from "./DashboardHeader";
+import { SummaryCards } from "./SummaryCards";
+import { ManagementPanel } from "./ManagementPanel";
+import { TaskBoard } from "./TaskBoard";
 
 const taskStatuses = ["To Do", "In Progress", "Done"];
 const taskPriorities = ["Low", "Medium", "High"];
@@ -9,7 +13,7 @@ const emptyTaskForm = {
   title: "",
   description: "",
   project: "",
-  assignedTo: "",
+  assignedTo: [],
   dueDate: "",
   priority: "Medium",
 };
@@ -27,6 +31,7 @@ export const Dashboard = ({ auth }) => {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [activePanel, setActivePanel] = useState("create-project");
   const [showUserMenu, setShowUserMenu] = useState(false);
   const userMenuRef = useRef(null);
 
@@ -124,12 +129,14 @@ export const Dashboard = ({ auth }) => {
   const tasksPerUser = useMemo(() => {
     const counts = {};
     filteredTasks.forEach((task) => {
-      if (!task.assignedTo) return;
-      const id = task.assignedTo._id;
-      if (!counts[id]) {
-        counts[id] = { name: task.assignedTo.name, count: 0 };
-      }
-      counts[id].count += 1;
+      const assignees = Array.isArray(task.assignedTo) ? task.assignedTo : [];
+      assignees.forEach((assignee) => {
+        const id = assignee._id;
+        if (!counts[id]) {
+          counts[id] = { name: assignee.name, count: 0 };
+        }
+        counts[id].count += 1;
+      });
     });
     return Object.values(counts);
   }, [filteredTasks]);
@@ -223,30 +230,15 @@ export const Dashboard = ({ auth }) => {
 
   return (
     <main className="mx-auto w-full max-w-7xl p-4 md:p-6">
-      <header className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Task Manager</h1>
-        </div>
-        <div className="relative" ref={userMenuRef}>
-          <button
-            type="button"
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-brand-600 text-sm font-bold text-white shadow-sm transition hover:bg-brand-700"
-            onClick={() => setShowUserMenu((prev) => !prev)}
-            title={auth.user.name}
-          >
-            {userInitial}
-          </button>
-
-          {showUserMenu ? (
-            <div className="absolute right-0 z-20 mt-2 w-44 rounded-lg border border-slate-200 bg-white p-2 shadow-lg">
-              <p className="px-2 py-1 text-xs text-slate-500">{auth.user.name}</p>
-              <button className="btn-secondary mt-1 w-full" onClick={auth.logout}>
-                Logout
-              </button>
-            </div>
-          ) : null}
-        </div>
-      </header>
+      <DashboardHeader
+        activePanel={activePanel}
+        setActivePanel={setActivePanel}
+        auth={auth}
+        showUserMenu={showUserMenu}
+        setShowUserMenu={setShowUserMenu}
+        userMenuRef={userMenuRef}
+        userInitial={userInitial}
+      />
 
       {error ? (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -254,336 +246,45 @@ export const Dashboard = ({ auth }) => {
         </div>
       ) : null}
 
-      <section className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {[
-          ["Projects", summary?.projects ?? 0],
-          ["Tasks", summary.total],
-          ["In Progress", summary.inProgress],
-          ["Overdue", summary.overdue],
-        ].map(([label, value]) => (
-          <article key={label} className="card">
-            <p className="text-sm text-slate-500">{label}</p>
-            <p className="mt-1 text-3xl font-bold">{value}</p>
-          </article>
-        ))}
-      </section>
+      <SummaryCards summary={summary} />
 
       <section className="grid gap-5 lg:grid-cols-12">
-        <div className="space-y-5 lg:col-span-4">
-          <form className="card space-y-3" onSubmit={createProject}>
-            <h2 className="text-lg font-semibold">Create Project</h2>
-            <div>
-              <label className="label">Name</label>
-              <input
-                className="input"
-                required
-                value={projectForm.name}
-                onChange={(event) =>
-                  setProjectForm((prev) => ({ ...prev, name: event.target.value }))
-                }
-              />
-            </div>
-            <div>
-              <label className="label">Description</label>
-              <textarea
-                className="input min-h-24"
-                value={projectForm.description}
-                onChange={(event) =>
-                  setProjectForm((prev) => ({ ...prev, description: event.target.value }))
-                }
-              />
-            </div>
-            <button className="btn-primary w-full" disabled={busy}>
-              Add project
-            </button>
-          </form>
+        <ManagementPanel
+          activePanel={activePanel}
+          createProject={createProject}
+          projectForm={projectForm}
+          setProjectForm={setProjectForm}
+          busy={busy}
+          addMember={addMember}
+          memberForm={memberForm}
+          setMemberForm={setMemberForm}
+          projectsWithRole={projectsWithRole}
+          createTask={createTask}
+          taskForm={taskForm}
+          setTaskForm={setTaskForm}
+          selectedProjectMembers={selectedProjectMembers}
+          taskPriorities={taskPriorities}
+          canCreateTask={canCreateTask}
+          tasksPerUser={tasksPerUser}
+          projects={projects}
+          auth={auth}
+          removeMember={removeMember}
+        />
 
-          <form className="card space-y-3" onSubmit={addMember}>
-            <h2 className="text-lg font-semibold">Add Member</h2>
-            <div>
-              <label className="label">Project</label>
-              <select
-                className="input"
-                required
-                value={memberForm.projectId}
-                onChange={(event) =>
-                  setMemberForm((prev) => ({ ...prev, projectId: event.target.value }))
-                }
-              >
-                <option value="">Select project</option>
-                {projectsWithRole
-                  .filter((project) => project.myRole === "Admin")
-                  .map((project) => (
-                    <option key={project._id} value={project._id}>
-                      {project.name}
-                    </option>
-                  ))}
-              </select>
-            </div>
-            <div>
-              <label className="label">Member Email</label>
-              <input
-                className="input"
-                type="email"
-                required
-                value={memberForm.email}
-                onChange={(event) =>
-                  setMemberForm((prev) => ({ ...prev, email: event.target.value }))
-                }
-              />
-            </div>
-            <button className="btn-secondary w-full" disabled={busy}>
-              Add member
-            </button>
-          </form>
-
-          <form className="card space-y-3" onSubmit={createTask}>
-            <h2 className="text-lg font-semibold">Create Task</h2>
-            <div>
-              <label className="label">Project</label>
-              <select
-                className="input"
-                required
-                value={taskForm.project}
-                onChange={(event) =>
-                  setTaskForm((prev) => ({
-                    ...prev,
-                    project: event.target.value,
-                    assignedTo: "",
-                  }))
-                }
-              >
-                <option value="">Select project</option>
-                {projectsWithRole
-                  .filter((project) => project.myRole === "Admin")
-                  .map((project) => (
-                    <option key={project._id} value={project._id}>
-                      {project.name}
-                    </option>
-                  ))}
-              </select>
-            </div>
-            {taskForm.project ? (
-              <>
-                <div>
-                  <label className="label">Title</label>
-                  <input
-                    className="input"
-                    required
-                    value={taskForm.title}
-                    onChange={(event) =>
-                      setTaskForm((prev) => ({ ...prev, title: event.target.value }))
-                    }
-                  />
-                </div>
-                <div>
-                  <label className="label">Description</label>
-                  <textarea
-                    className="input min-h-20"
-                    value={taskForm.description}
-                    onChange={(event) =>
-                      setTaskForm((prev) => ({ ...prev, description: event.target.value }))
-                    }
-                  />
-                </div>
-                <div>
-                  <label className="label">Assign to</label>
-                  <select
-                    className="input"
-                    required
-                    value={taskForm.assignedTo}
-                    onChange={(event) =>
-                      setTaskForm((prev) => ({ ...prev, assignedTo: event.target.value }))
-                    }
-                  >
-                    <option value="">Select member</option>
-                    {selectedProjectMembers.map((member) => (
-                      <option key={member.user?._id} value={member.user?._id}>
-                        {member.user?.name} ({member.role})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className="label">Due date</label>
-                    <input
-                      className="input"
-                      type="date"
-                      required
-                      value={taskForm.dueDate}
-                      onChange={(event) =>
-                        setTaskForm((prev) => ({ ...prev, dueDate: event.target.value }))
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label className="label">Priority</label>
-                    <select
-                      className="input"
-                      value={taskForm.priority}
-                      onChange={(event) =>
-                        setTaskForm((prev) => ({ ...prev, priority: event.target.value }))
-                      }
-                    >
-                      {taskPriorities.map((item) => (
-                        <option key={item} value={item}>
-                          {item}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <button className="btn-primary w-full" disabled={busy || !canCreateTask}>
-                  Add task
-                </button>
-              </>
-            ) : null}
-          </form>
-
-          <div className="card">
-            <h2 className="text-lg font-semibold">Tasks Per User</h2>
-            <div className="mt-3 space-y-2">
-              {tasksPerUser.length === 0 ? (
-                <p className="text-sm text-slate-500">No assigned tasks yet.</p>
-              ) : (
-                tasksPerUser.map((item) => (
-                  <div
-                    key={item.name}
-                    className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm"
-                  >
-                    <span>{item.name}</span>
-                    <span className="font-semibold">{item.count}</span>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          <div className="card">
-            <h2 className="text-lg font-semibold">Project Members</h2>
-            <div className="mt-3 space-y-3">
-              {projects.map((project) => {
-                const myRole = project.members.find(
-                  (member) => member.user?._id === auth.user._id
-                )?.role;
-                return (
-                  <div key={project._id} className="rounded-lg border border-slate-200 p-3">
-                    <p className="font-medium">{project.name}</p>
-                    <div className="mt-2 space-y-2">
-                      {project.members.map((member) => (
-                        <div
-                          key={member.user?._id}
-                          className="flex items-center justify-between rounded bg-slate-50 px-2 py-1 text-sm"
-                        >
-                          <span>
-                            {member.user?.name} ({member.role})
-                          </span>
-                          {myRole === "Admin" &&
-                          member.role !== "Admin" &&
-                          member.user?._id !== auth.user._id ? (
-                            <button
-                              type="button"
-                              className="btn-secondary text-xs"
-                              onClick={() => removeMember(project._id, member.user._id)}
-                              disabled={busy}
-                            >
-                              Remove
-                            </button>
-                          ) : null}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        <div className="card lg:col-span-8">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold">Task Board</h2>
-            <button className="btn-secondary" onClick={loadData} disabled={busy}>
-              Refresh
-            </button>
-          </div>
-
-          <div className="mb-4 grid gap-3 sm:grid-cols-3">
-            <input
-              className="input"
-              placeholder="Search tasks..."
-              value={searchText}
-              onChange={(event) => setSearchText(event.target.value)}
-            />
-            <select
-              className="input"
-              value={selectedProjectId}
-              onChange={(event) => setSelectedProjectId(event.target.value)}
-            >
-              <option value="all">All projects</option>
-              {projects.map((project) => (
-                <option key={project._id} value={project._id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
-            <select
-              className="input"
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
-            >
-              <option value="all">All status</option>
-              {taskStatuses.map((status) => (
-                <option key={status} value={status}>
-                  {status}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {filteredTasks.length === 0 ? (
-            <p className="text-sm text-slate-500">No tasks yet.</p>
-          ) : (
-            <div className="space-y-3">
-              {filteredTasks.map((task) => (
-                <article
-                  key={task._id}
-                  className="rounded-lg border border-slate-200 bg-slate-50 p-4"
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <h3 className="font-semibold">{task.title}</h3>
-                      <p className="text-sm text-slate-600">{task.description || "No notes"}</p>
-                      <p className="mt-1 text-xs text-slate-500">Project: {task.project?.name}</p>
-                      <p className="text-xs text-slate-500">
-                        Assigned: {task.assignedTo?.name || "Unassigned"} | Priority:{" "}
-                        {task.priority}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-500">
-                        Due: {new Date(task.dueDate).toLocaleDateString()}
-                      </span>
-                      <select
-                        className="input w-36"
-                        value={task.status}
-                        onChange={(event) => updateTaskStatus(task._id, event.target.value)}
-                        disabled={busy}
-                      >
-                        {taskStatuses.map((item) => (
-                          <option key={item} value={item}>
-                            {item}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </div>
+        <TaskBoard
+          loadData={loadData}
+          busy={busy}
+          searchText={searchText}
+          setSearchText={setSearchText}
+          selectedProjectId={selectedProjectId}
+          setSelectedProjectId={setSelectedProjectId}
+          projects={projects}
+          statusFilter={statusFilter}
+          setStatusFilter={setStatusFilter}
+          taskStatuses={taskStatuses}
+          filteredTasks={filteredTasks}
+          updateTaskStatus={updateTaskStatus}
+        />
       </section>
     </main>
   );

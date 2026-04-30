@@ -1,6 +1,6 @@
 # Team Task Manager
 
-This is a full-stack Team Task Manager app where users can create projects, invite teammates, assign tasks, and track progress.
+This is a full stack Team Task Manager app where users can create projects, invite teammates, assign tasks, and track progress.
 
 The project is built for a coding assignment and follows the required stack:
 - React.js (frontend)
@@ -29,6 +29,8 @@ The project is built for a coding assignment and follows the required stack:
 
 - `client` -> React frontend
 - `server` -> Express backend
+- `client/.env.example` -> frontend environment template
+- `server/.env.example` -> backend environment template
 
 ---
 
@@ -41,7 +43,7 @@ cd server
 npm install
 ```
 
-Create `server/.env`:
+Create `server/.env` from `server/.env.example`:
 
 ```env
 PORT=5000
@@ -65,7 +67,7 @@ cd client
 npm install
 ```
 
-Create `client/.env`:
+Create `client/.env` from `client/.env.example`:
 
 ```env
 VITE_API_URL=http://localhost:5000/api
@@ -106,6 +108,16 @@ Frontend runs on `http://localhost:5173` by default.
 
 ---
 
+## Developer quality upgrades included
+
+- Split frontend into reusable components (`DashboardHeader`, `ManagementPanel`, `TaskBoard`, `SummaryCards`)
+- Strong API request validation with `express-validator`
+- Clear field-level validation errors for bad requests
+- Multi-assignee task support with proper role checks
+- Environment variable templates for local and deployment setup
+
+---
+
 ## Deployment on Railway
 
 Deploy backend and frontend as separate services.
@@ -122,13 +134,3 @@ Deploy backend and frontend as separate services.
 
 ---
 
-## Assignment submission checklist
-
-- Live app URL (public)
-- GitHub repository link
-- Updated README (this file)
-- 2-5 minute demo video explaining:
-  - authentication
-  - project + member flow
-  - task assignment + status update
-  - dashboard overview

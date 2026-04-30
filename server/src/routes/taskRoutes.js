@@ -13,19 +13,26 @@ import {
   checkProjectMember,
   checkTaskProjectAdmin,
 } from '../middleware/roles.js';
+import { validateRequest } from '../middleware/validate.js';
+import {
+  createTaskValidator,
+  projectTaskParamValidator,
+  taskIdParamValidator,
+  updateTaskValidator,
+} from '../validators/taskValidators.js';
 
 const router = express.Router();
 
 // All routes are protected
 router.use(protect);
 
-router.post('/', checkProjectAdmin, createTask);
+router.post('/', createTaskValidator, validateRequest, checkProjectAdmin, createTask);
 router.get('/my-tasks', getMyTasks);
-router.get('/project/:projectId', checkProjectMember, getProjectTasks);
-router.get('/dashboard/:projectId', checkProjectMember, getDashboardStats);
+router.get('/project/:projectId', projectTaskParamValidator, validateRequest, checkProjectMember, getProjectTasks);
+router.get('/dashboard/:projectId', projectTaskParamValidator, validateRequest, checkProjectMember, getDashboardStats);
 
 router.route('/:id')
-  .put(updateTask)
-  .delete(checkTaskProjectAdmin, deleteTask);
+  .put(updateTaskValidator, validateRequest, updateTask)
+  .delete(taskIdParamValidator, validateRequest, checkTaskProjectAdmin, deleteTask);
 
 export default router;
