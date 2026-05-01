@@ -29,8 +29,8 @@ The project is built for a coding assignment and follows the required stack:
 
 - `client` -> React frontend
 - `server` -> Express backend
-- `client/.env.example` -> frontend environment template
-- `server/.env.example` -> backend environment template
+- `server/.env` -> backend environment (create/edit this file)
+- `client/.env` -> frontend environment (create/edit this file)
 
 ---
 
@@ -43,16 +43,18 @@ cd server
 npm install
 ```
 
-Create `server/.env` from `server/.env.example`:
+Create or edit `server/.env` (this is the file the app reads):
 
 ```env
 PORT=5000
-MONGODB_URI=your_mongodb_connection_string
+MONGODB_URI=mongodb://127.0.0.1:27017/task_manager
 JWT_SECRET=your_super_secret_key
 JWT_EXPIRE=7d
-FRONTEND_URL=http://localhost:5173,http://localhost:3000
+FRONTEND_URL=http://localhost:5173,http://localhost:5174,http://localhost:3000
 NODE_ENV=development
 ```
+
+**Local MongoDB note:** `ECONNREFUSED 127.0.0.1:27017` means MongoDB is not running (or not on port `27017`). Start the MongoDB Windows service, then restart the backend.
 
 Start backend:
 
@@ -67,11 +69,13 @@ cd client
 npm install
 ```
 
-Create `client/.env` from `client/.env.example`:
+Create or edit `client/.env`:
 
 ```env
 VITE_API_URL=http://localhost:5000/api
 ```
+
+If your backend is not on port `5000`, update `VITE_API_URL` to match (example: `http://localhost:8080/api`).
 
 Start frontend:
 
@@ -114,7 +118,7 @@ Frontend runs on `http://localhost:5173` by default.
 - Strong API request validation with `express-validator`
 - Clear field-level validation errors for bad requests
 - Multi-assignee task support with proper role checks
-- Environment variable templates for local and deployment setup
+- `.env` based configuration for local development (and Railway variables for deployment)
 
 ---
 
